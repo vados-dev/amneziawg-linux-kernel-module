@@ -1406,12 +1406,24 @@ static inline char *nla_strdup(const struct nlattr *nla, gfp_t flags)
 #define COMPAT_CANNOT_USE_NETLINK_MCGRPS
 #endif
 
-/* Kernel 6.19+ renamed blake2s_state to blake2s_ctx and changed blake2s() arg order */
+/* Kernel 6.19+ renamed blake2s_state to blake2s_ctx and changed blake2s() arg order.
+ * On kernels < 5.10 with zinc crypto (COMPAT_INIT_CRYPTO / ISUBUNTU2004), we must
+ * use zinc's own blake2s header to avoid duplicate symbol conflicts with the
+ * system <crypto/blake2s.h> whose names are already macro-remapped to zinc_*.
+ */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0)
-#include <crypto/blake2s.h>
-#define blake2s_ctx blake2s_state
-#define blake2s(key, keylen, in, inlen, out, outlen) \
-	blake2s(out, in, key, outlen, inlen, keylen)
+    #if defined(ISUBUNTU2004) || defined(COMPAT_INIT_CRYPTO)
+        #include "../crypto/include/zinc/blake2s.h"
+        #ifndef _CRYPTO_BLAKE2S_H
+            #define _CRYPTO_BLAKE2S_H
+        #endif
+    #else
+        #include <crypto/blake2s.h>
+    #endif
+
+    #define blake2s_ctx blake2s_state
+    #define blake2s(key, keylen, in, inlen, out, outlen) \
+            (blake2s)((u8 *)(out), (const u8 *)(in), (const u8 *)(key), (size_t)(outlen), (size_t)(inlen), (size_t)(keylen))
 #endif
 
 #endif /* _WG_COMPAT_H */
