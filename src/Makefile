@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 
-WIREGUARD_VERSION = 2.0.20260725
+WIREGUARD_VERSION = 1.0.0
 OMIT_ENDPOINTS ?=
 
 KERNELRELEASE ?= $(shell uname -r)
