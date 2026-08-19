@@ -4,7 +4,6 @@
  */
 
 #include "device.h"
-#include "header_protection.h"
 #include "peer.h"
 #include "socket.h"
 #include "queueing.h"
@@ -137,7 +136,8 @@ static int send6(struct wg_device *wg, struct sk_buff *skb,
 			if (cache)
 				dst_cache_reset(cache);
 		}
-		dst = ip6_dst_lookup_flow(sock_net(sock), sock, &fl, NULL);
+		dst = ipv6_stub->ipv6_dst_lookup_flow(sock_net(sock), sock, &fl,
+						      NULL);
 		if (IS_ERR(dst)) {
 			ret = PTR_ERR(dst);
 			net_dbg_ratelimited("%s: No route to %pISpfsc, error %d\n",
@@ -187,49 +187,30 @@ int wg_socket_send_skb_to_peer(struct wg_peer *peer, struct sk_buff *skb, u8 ds)
 }
 
 int wg_socket_send_buffer_to_peer(struct wg_peer *peer, void *buffer,
-				  size_t len, u8 ds, size_t padding)
+				  size_t len, u8 ds, size_t junk_size)
 {
-	struct sk_buff *skb;
-	void *crypto = NULL;
-	size_t trailer_len;
-	struct chacha_state state;
+	void* junk;
+	struct sk_buff *skb = alloc_skb(len + junk_size + SKB_HEADER_LEN, GFP_ATOMIC);
 
-	trailer_len = wg_peer_skb_random_trailer(peer, peer->device, padding + len);
-	
-	skb = alloc_skb(len + padding + trailer_len + SKB_HEADER_LEN, GFP_ATOMIC);
 	if (unlikely(!skb))
 		return -ENOMEM;
 
 	skb_reserve(skb, SKB_HEADER_LEN);
 	skb_set_inner_network_header(skb, 0);
-
-	if (padding) {
-		crypto = skb_put(skb, padding);
-		get_random_bytes(crypto, padding);
-	}
-
-	buffer = skb_put_data(skb, buffer, len);
-
-	if (trailer_len)
-		get_random_bytes(skb_put(skb, trailer_len), trailer_len);
-
-	if (crypto &&
-			awg_header_protection_init(&state, peer->device, crypto))
-		chacha20_crypt(&state, buffer, buffer, len);
-
+	junk = skb_put(skb, junk_size);
+	get_random_bytes(junk, junk_size);
+	skb_put_data(skb, buffer, len);
 	return wg_socket_send_skb_to_peer(peer, skb, ds);
 }
 
 int wg_socket_send_buffer_as_reply_to_skb(struct wg_device *wg,
 					  struct sk_buff *in_skb, void *buffer,
-					  size_t len, size_t padding)
+					  size_t len, size_t junk_size)
 {
 	int ret = 0;
 	struct sk_buff *skb;
-	void* crypto = NULL;
-	struct chacha_state state;
 	struct endpoint endpoint;
-	unsigned int trailer_len;
+	void* junk;
 
 	if (unlikely(!in_skb))
 		return -EINVAL;
@@ -237,27 +218,14 @@ int wg_socket_send_buffer_as_reply_to_skb(struct wg_device *wg,
 	if (unlikely(ret < 0))
 		return ret;
 
-	trailer_len = wg_peer_skb_random_trailer(NULL, wg, padding + len);
-
-	skb = alloc_skb(padding + len + trailer_len + SKB_HEADER_LEN, GFP_ATOMIC);
+	skb = alloc_skb(len + junk_size + SKB_HEADER_LEN, GFP_ATOMIC);
 	if (unlikely(!skb))
 		return -ENOMEM;
 	skb_reserve(skb, SKB_HEADER_LEN);
 	skb_set_inner_network_header(skb, 0);
-
-	if (padding) {
-		crypto = skb_put(skb, padding);
-		get_random_bytes(crypto, padding);
-	}
-
-	buffer = skb_put_data(skb, buffer, len);
-
-	if (trailer_len)
-		get_random_bytes(skb_put(skb, trailer_len), trailer_len);
-
-	if (crypto &&
-			awg_header_protection_init(&state, wg, crypto))
-		chacha20_crypt(&state, buffer, buffer, len);
+	junk = skb_put(skb, junk_size);
+	get_random_bytes(junk, junk_size);
+	skb_put_data(skb, buffer, len);
 
 	if (endpoint.addr.sa_family == AF_INET)
 		ret = send4(wg, skb, &endpoint, 0, NULL);
@@ -332,7 +300,6 @@ void wg_socket_set_peer_endpoint(struct wg_peer *peer,
 	dst_cache_reset(&peer->endpoint_cache);
 out:
 	write_unlock_bh(&peer->endpoint_lock);
-	WRITE_ONCE(peer->udp_window, DEFAULT_UDP_WINDOW);
 }
 
 void wg_socket_set_peer_endpoint_from_skb(struct wg_peer *peer,

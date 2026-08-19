@@ -247,16 +247,13 @@ void jp_spec_free(struct jp_spec *spec) {
     spec->mods_size = 0;
 }
 
-int jp_spec_setup(struct jp_spec *spec, const char* str) {
+int jp_spec_setup(struct jp_spec *spec) {
     int err = 0;
     int pkt_size, mods_size;
     struct jp_tag *tag, *tmp;
     struct jp_modifier *mod;
-    char* buf, *desc;
+    char* buf;
     LIST_HEAD(head);
-
-    if (str == NULL)
-        return 0;
 
     mutex_lock(&spec->lock);
 
@@ -267,13 +264,12 @@ int jp_spec_setup(struct jp_spec *spec, const char* str) {
     spec->pkt_size = 0;
     spec->mods_size = 0;
 
-    desc = kstrdup(str, GFP_KERNEL);
-    if (!desc) {
-        err = -ENOMEM;
-        goto error;
+    if (spec->desc == NULL) {
+        mutex_unlock(&spec->lock);
+        return 0;
     }
 
-    buf = kstrdup(desc, GFP_KERNEL);
+    buf = kstrdup(spec->desc, GFP_KERNEL);
     if (!buf) {
         err = -ENOMEM;
         goto error;
@@ -291,6 +287,11 @@ int jp_spec_setup(struct jp_spec *spec, const char* str) {
 
         if (tag->func)
             ++mods_size;
+    }
+
+    if (pkt_size > MESSAGE_MAX_SIZE) {
+        err = -EINVAL;
+        goto error;
     }
 
     spec->pkt = kzalloc(pkt_size, GFP_KERNEL);
@@ -317,20 +318,14 @@ int jp_spec_setup(struct jp_spec *spec, const char* str) {
         spec->pkt_size += tag->pkt_size;
     }
 
-    kfree(spec->desc);
-    spec->desc = desc;
-
 error:
-    mutex_unlock(&spec->lock);
     list_for_each_entry_safe(tag, tmp, &head, head) {
         jp_tag_free(tag);
         list_del(&tag->head);
         kfree(tag);
     }
-
     kfree(buf);
-    if (err)
-        kfree(desc);
+    mutex_unlock(&spec->lock);
     return err;
 }
 
