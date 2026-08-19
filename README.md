@@ -73,21 +73,29 @@ the reboot afterwards.
 sudo dnf install -y kernel-devel-$(uname -r)
 Then rebuild:
 
+```shell
 sudo dkms install "amneziawg/$(dkms status | grep amneziawg | awk -F'[/, ]+' '{print $2}' | head -1)" -k $(uname -r)
 To prevent this in the future, install the headers meta-package . see Installation.
+```
 
 Updating to a new version
+```shell
 cd amneziawg-linux-kernel-module/src
 git pull
+```
 
 # Remove old DKMS registration:
+```shell
 sudo dkms remove "amneziawg/$(dkms status | grep amneziawg | awk -F'[/, ]+' '{print $2}' | head -1)" --all
+```
 
 # Install new version:
+```shell
 sudo make dkms-install
 sudo dkms install "amneziawg/$(make print-version)"
+```
 
-https://github.com/vados-dev/amneziawg-linux-kernel-module-vds/blob/main/docs/TROUBLESHOOTING.md
+[TROUBLESHOOTING](https://github.com/vados-dev/amneziawg-linux-kernel-module-vds/blob/main/docs/TROUBLESHOOTING.md)
 
 ## Manual build
 
