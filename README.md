@@ -66,9 +66,28 @@ Open `Terminal` and run:
 sudo dnf copr enable amneziavpn/amneziawg
 sudo dnf install amneziawg-dkms amneziawg-tools
 ```
-
 Before installation it is strictly recommended to upgrade your system kernel to the latest available version and perform
 the reboot afterwards.
+
+# DKMS:
+sudo dnf install -y kernel-devel-$(uname -r)
+Then rebuild:
+
+sudo dkms install "amneziawg/$(dkms status | grep amneziawg | awk -F'[/, ]+' '{print $2}' | head -1)" -k $(uname -r)
+To prevent this in the future, install the headers meta-package . see Installation.
+
+Updating to a new version
+cd amneziawg-linux-kernel-module/src
+git pull
+
+# Remove old DKMS registration:
+sudo dkms remove "amneziawg/$(dkms status | grep amneziawg | awk -F'[/, ]+' '{print $2}' | head -1)" --all
+
+# Install new version:
+sudo make dkms-install
+sudo dkms install "amneziawg/$(make print-version)"
+
+https://github.com/vados-dev/amneziawg-linux-kernel-module-vds/blob/main/docs/TROUBLESHOOTING.md
 
 ## Manual build
 
@@ -76,7 +95,7 @@ You may need to install kernel headers and/or build essentials packages before r
 
 1. In Terminal:
     ```shell
-    git clone https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git
+    git clone https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git -b stable-20260705
     cd amneziawg-linux-kernel-module/src
     ```
 

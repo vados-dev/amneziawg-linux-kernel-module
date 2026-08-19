@@ -26,4 +26,3 @@ src/generated
 src/kernel
 .cache
 compile_commands.json
-.clangd
