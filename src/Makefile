@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 
-VDS_GITHUB_VERSION := $(shell git log -1 --format='3.1.%cd-vds' --date=format:'%Y%m%d' 2>/dev/null || echo 3.1.0-vds)
+VDS_GITHUB_VERSION := $(shell git log -1 --format='3.1.%cd' --date=format:'%Y%m%d' 2>/dev/null || echo 3.1.0)
 WIREGUARD_VERSION := $(VDS_GITHUB_VERSION)
 OMIT_ENDPOINTS ?=
 
