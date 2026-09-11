@@ -2,7 +2,8 @@
 #
 # Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 
-WIREGUARD_VERSION = 1.0.0
+VDS_GITHUB_VERSION := $(shell git log -1 --format='3.1.%cd-vds' --date=format:'%Y%m%d' 2>/dev/null || echo 3.1.0-vds)
+WIREGUARD_VERSION := $(VDS_GITHUB_VERSION)
 OMIT_ENDPOINTS ?=
 
 KERNELRELEASE ?= $(shell uname -r)
@@ -40,8 +41,14 @@ install: module-install
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 DKMS_SOURCES := version.h Makefile Kbuild Kconfig dkms.conf $(filter-out version.h wireguard.mod.c tests/%,$(call rwildcard,,*.c *.h *.S *.pl *.include))
+print-version:
+	@echo "$(WIREGUARD_VERSION)"
+
 dkms-install: $(DKMS_SOURCES)
 	@$(foreach f,$(DKMS_SOURCES),install -v -m0644 -D $(f) $(DESTDIR)$(DKMSDIR)/$(f);)
+	@sed -i 's/^PACKAGE_VERSION=.*/PACKAGE_VERSION="$(WIREGUARD_VERSION)"/' $(DESTDIR)$(DKMSDIR)/dkms.conf
+	@printf '#ifndef WIREGUARD_VERSION\n#define WIREGUARD_VERSION "%s"\n#endif\n' "$(WIREGUARD_VERSION)" > $(DESTDIR)$(DKMSDIR)/version.h
+	@echo ""; echo "Installed version: $(WIREGUARD_VERSION)"; echo "DKMS directory:    $(DESTDIR)$(DKMSDIR)"
 
 style:
 	$(KERNELDIR)/scripts/checkpatch.pl -f --max-line-length=4000 --codespell --color=always $(filter-out wireguard.mod.c,$(wildcard *.c)) $(wildcard *.h) $(wildcard selftest/*.c)
@@ -57,4 +64,4 @@ cloc:
 
 -include tests/debug.mk
 
-.PHONY: all module module-debug apply-patches module-install install dkms-install clean cloc check style
+.PHONY: all module module-debug apply-patches module-install install print-version dkms-install clean cloc check style
